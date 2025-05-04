@@ -1,0 +1,18 @@
+services:
+
+  askepub:
+    image: drumsergio/askepub:1.0.0
+    # build: .
+    environment:
+      - TOKEN=YOUR-TOKEN
+      - TOKEN_NOTIFY=YOUR-OTHER-BOT-TOKEN
+      - OPENAI_API_KEY=OPENAI-KEY
+      - ADMIN_ID=TELEGRAM-ADMIN-ID
+      - USER_IDS=USER-IDS,SEPARATED-BY,COMMAS
+    volumes:
+      - dbs:/app/dbs
+      - userBackups:/app/userBackups
+
+volumes:
+  dbs:
+  userBackups: 
