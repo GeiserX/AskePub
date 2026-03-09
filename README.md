@@ -1,34 +1,77 @@
 ![img](https://github.com/GeiserX/askepub/blob/main/extra/logo.jpg?raw=true)
 # AskePub
 
-[![askepub compliant](https://img.shields.io/github/license/GeiserX/askepub)](https://github.com/GeiserX/askepub/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/GeiserX/askepub)](https://github.com/GeiserX/askepub/blob/main/LICENSE)
 
-This project is a Telegram bot assistant to help you prepare ePubs. It uses ChatGPT-4o to write contextual notes.
+Telegram bot that helps you study any ePub book using AI-generated notes. Upload an ePub, pick your chapters, customize your study questions, and get back an annotated ePub, Word document, and PDF with contextual study notes powered by GPT-4o.
 
-## Table of Contents
+## Features
 
-- [Install](#install)
-- [Usage](#usage)
-- [Maintainers](#maintainers)
-- [Contributing](#contributing)
+- Upload any `.epub` file via Telegram
+- Select specific chapters or study the entire book
+- Customize up to 10 study questions (or use smart defaults)
+- Get three output formats:
+  - **Annotated ePub** with study notes injected into each chapter
+  - **Word document** (.docx) with all notes organized by chapter
+  - **PDF** with the same content
+- Multi-language support (English, Spanish, Italian, French, German, Portuguese, Bulgarian)
+- User access control via whitelist
+- Rate limiting to manage API costs
+- Admin notification and broadcast system
 
 ## Install
 
-This project uses a [Docker container](https://hub.docker.com/repository/docker/drumsergio/askepub) to deploy a Telegram Bot handler.
+### Docker (recommended)
 
 ```sh
-$ docker run --name askepub -e TOKEN=[TOKEN] -e OPENAI_API_KEY=[KEY] drumsergio/askepub
+docker run --name askepub \
+  -e TOKEN=your-telegram-bot-token \
+  -e OPENAI_API_KEY=your-openai-key \
+  -e ADMIN_ID=your-telegram-user-id \
+  -e USER_IDS=id1,id2,id3 \
+  -v askepub-dbs:/app/dbs \
+  -v askepub-backups:/app/userBackups \
+  drumsergio/askepub:2.0.0
 ```
 
-Docker Hub image available at [drumsergio/askepub](https://hub.docker.com/repository/docker/drumsergio/askepub).
+### Docker Compose
+
+```sh
+docker compose up -d
+```
+
+See [`docker-compose.yml`](docker-compose.yml) for the full configuration.
+
+### Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `TOKEN` | Yes | Telegram bot token from @BotFather |
+| `OPENAI_API_KEY` | Yes | OpenAI API key |
+| `ADMIN_ID` | Yes | Telegram user ID of the bot admin |
+| `TOKEN_NOTIFY` | No | Secondary bot token for admin notifications |
+| `USER_IDS` | No | Comma-separated Telegram user IDs allowed to use the bot |
 
 ## Usage
 
-Use the command `/start` and follow the prompts
+1. Start a chat with your bot on Telegram
+2. Send `/start`
+3. Select your language
+4. Upload an `.epub` file
+5. Choose which chapters to study
+6. Customize your study questions (or use defaults)
+7. Wait for the AI to generate notes
+8. Download your annotated ePub, DOCX, and PDF
+
+### Commands
+
+- `/start` - Start the bot and begin a study session
+- `/change_language` - Change your interface language
+- `/cancel` - Cancel the current operation
 
 ## Maintainers
 
-[@GeiserX](https://github.com/GeiserX).
+[@GeiserX](https://github.com/GeiserX)
 
 ## Contributing
 
@@ -36,9 +79,6 @@ Feel free to dive in! [Open an issue](https://github.com/GeiserX/askepub/issues/
 
 AskePub follows the [Contributor Covenant](http://contributor-covenant.org/version/2/1/) Code of Conduct.
 
-### Contributors
+## License
 
-This project exists thanks to all the people who contribute. 
-<a href="https://github.com/GeiserX/askepub/graphs/contributors"><img src="https://opencollective.com/askepub/contributors.svg?width=890&button=false" /></a>
-
-
+[MIT](LICENSE)

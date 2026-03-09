@@ -1,0 +1,169 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: AskePub 1.0\n"
+"POT-Creation-Date: 2026-03-09 00:00+0100\n"
+"PO-Revision-Date: 2026-03-09 00:00+0100\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: bg\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Hola! Bienvenido a AskePub. Por favor, selecciona tu idioma:"
+msgstr "Здравейте! Добре дошли в AskePub. Моля, изберете вашия език:"
+
+msgid "Idioma seleccionado: {lang}. Envíame un archivo .epub para comenzar."
+msgstr "Избран език: {lang}. Изпратете ми .epub файл, за да започнем."
+
+msgid "Por favor, envía un archivo .epub válido."
+msgstr "Моля, изпратете валиден .epub файл."
+
+msgid "Archivo recibido. Analizando..."
+msgstr "Файлът е получен. Анализиране..."
+
+msgid ""
+"He encontrado {count} capítulos en este libro:\n"
+"\n"
+"{chapters}\n"
+"\n"
+"Escribe los números de los capítulos que quieres estudiar (ej: 1,3,5 o 1-5 "
+"o '{all_word}')."
+msgstr ""
+"Открих {count} глави в тази книга:\n"
+"\n"
+"{chapters}\n"
+"\n"
+"Напишете номерата на главите, които искате да изучавате (напр.: 1,3,5 или "
+"1-5 или '{all_word}')."
+
+msgid ""
+"Selección no válida. Por favor, usa números separados por comas (1,3,5), "
+"rangos (1-5), o escribe '{all_word}'."
+msgstr ""
+"Невалиден избор. Моля, използвайте числа, разделени със запетаи (1,3,5), "
+"диапазони (1-5), или напишете '{all_word}'."
+
+#, python-brace-format
+msgid ""
+"Has seleccionado {count} capítulo(s). Tus preguntas actuales:\n"
+"\n"
+"{questions}\n"
+"\n"
+"¿Quieres personalizar las preguntas?"
+msgstr ""
+"Избрахте {count} глава(и). Вашите текущи въпроси:\n"
+"\n"
+"{questions}\n"
+"\n"
+"Искате ли да персонализирате въпросите?"
+
+msgid "Sí, personalizar"
+msgstr "Да, персонализирай"
+
+msgid "No, continuar"
+msgstr "Не, продължи"
+
+msgid "¿Qué deseas hacer?"
+msgstr "Какво желаете да направите?"
+
+msgid "Editar pregunta"
+msgstr "Редактирай въпрос"
+
+msgid "Eliminar pregunta"
+msgstr "Изтрий въпрос"
+
+msgid "Añadir pregunta"
+msgstr "Добави въпрос"
+
+msgid "Continuar con la preparación"
+msgstr "Продължи с подготовката"
+
+msgid "Escribe el número de la pregunta a editar:"
+msgstr "Напишете номера на въпроса за редактиране:"
+
+#, python-brace-format
+msgid "Escribe el nuevo texto para la pregunta {num}:"
+msgstr "Напишете новия текст за въпрос {num}:"
+
+msgid "Pregunta actualizada."
+msgstr "Въпросът е актуализиран."
+
+msgid "Escribe el número de la pregunta a eliminar:"
+msgstr "Напишете номера на въпроса за изтриване:"
+
+msgid "Pregunta eliminada."
+msgstr "Въпросът е изтрит."
+
+msgid "No puedes eliminar la última pregunta."
+msgstr "Не можете да изтриете последния въпрос."
+
+msgid "Escribe el texto de la nueva pregunta:"
+msgstr "Напишете текста на новия въпрос:"
+
+msgid "Pregunta añadida."
+msgstr "Въпросът е добавен."
+
+msgid "Preparando tus notas de estudio. Esto puede tardar unos minutos..."
+msgstr "Подготовка на вашите бележки за учене. Това може да отнеме няколко минути..."
+
+msgid "Aquí tienes tus archivos:"
+msgstr "Ето вашите файлове:"
+
+msgid "ePub anotado con tus notas de estudio"
+msgstr "Анотиран ePub с вашите бележки за учене"
+
+msgid "Documento Word con las notas"
+msgstr "Word документ с бележките"
+
+msgid "Documento PDF con las notas"
+msgstr "PDF документ с бележките"
+
+msgid "¿Deseas estudiar otro libro o más capítulos?"
+msgstr "Искате ли да изучавате друга книга или повече глави?"
+
+msgid "Sí"
+msgstr "Да"
+
+msgid "No"
+msgstr "Не"
+
+msgid "Gracias por usar AskePub. Usa /start para comenzar de nuevo."
+msgstr "Благодарим ви, че използвахте AskePub. Използвайте /start, за да започнете отново."
+
+msgid "Error al procesar el archivo. Por favor, intenta con otro .epub."
+msgstr "Грешка при обработката на файла. Моля, опитайте с друг .epub."
+
+#, python-brace-format
+msgid "Has alcanzado el límite. Intenta de nuevo en {minutes} minutos."
+msgstr "Достигнахте лимита. Опитайте отново след {minutes} минути."
+
+msgid "No tienes permiso para usar este bot."
+msgstr "Нямате разрешение да използвате този бот."
+
+msgid "Operación cancelada."
+msgstr "Операцията е отменена."
+
+msgid "todos"
+msgstr "всички"
+
+msgid ""
+"¿Quieres mantener tus preguntas anteriores o usar las predeterminadas?"
+msgstr ""
+"Искате ли да запазите предишните си въпроси или да използвате тези по "
+"подразбиране?"
+
+msgid "Mantener preguntas"
+msgstr "Запази въпросите"
+
+msgid "Usar predeterminadas"
+msgstr "Използвай по подразбиране"
+
+msgid "Resume los puntos clave y argumentos principales de esta sección"
+msgstr "Обобщете ключовите точки и основните аргументи на този раздел"
+
+msgid "¿Cuáles son los conceptos o términos más importantes introducidos?"
+msgstr "Кои са най-важните въведени концепции или термини?"
+
+msgid "¿Qué preguntas plantea o deja sin responder esta sección?"
+msgstr "Какви въпроси повдига или оставя без отговор този раздел?"

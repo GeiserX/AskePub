@@ -1,392 +1,463 @@
-# core_worker.py
+# core_worker.py - AskePub Core Worker
+# Generic ePub study assistant: parse, annotate, and export study notes.
 
-# Import necessary modules
 import os
-import shutil
+import copy
+import hashlib
 import logging
-import zipfile
-import subprocess
-import hashlib  # For calculating SHA-256 hash
 import sqlite3
-import json
+import subprocess
 import pytz
-import requests
-import gettext  # For translations
 from datetime import datetime
+
+import ebooklib
+from ebooklib import epub
 from bs4 import BeautifulSoup
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
 from docx.shared import Pt
+from openai import OpenAI
 
-# Set up logging
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO
+    level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
 
-# Import LangChain and OpenAI
-import openai
-import langchain
-from langchain.cache import SQLiteCache
-from langchain.chat_models import ChatOpenAI
-from langchain.memory import ConversationBufferMemory
-from langchain.chains import LLMChain
-from langchain.prompts import (
-    PromptTemplate
-)
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+TIMEZONE = pytz.timezone("Europe/Madrid")
+CACHE_DB_PATH = "/app/dbs/cache.db"
+OPENAI_MODEL = "gpt-4o-mini"
 
-# Set up caching
-langchain.llm_cache = SQLiteCache(database_path="/app/dbs/langchain.db")
+# Minimum plain-text length for a chapter to be considered real content
+# (filters out cover pages, copyright notices, etc.)
+MIN_CHAPTER_TEXT_LENGTH = 200
 
-#########################################
-### HELPER: DESCRIBE EPUBLIBRARY FILE ###
-#########################################
 
-def describe_epublibrary(telegram_user):
-    logger.info("describe_epublibrary - Telegram User: {0}".format(telegram_user))
-    epubfile = "userBackups/{0}.epublibrary".format(telegram_user)
+# ===================================================================
+# 1. parse_epub
+# ===================================================================
 
-    with zipfile.ZipFile(epubfile, 'r') as zip_ref:
-        files = zip_ref.namelist()
-        zip_ref.extractall("userBackups/{0}/".format(telegram_user))
+def parse_epub(epub_path: str) -> list[dict]:
+    """Read an ePub file and return a list of chapter dicts.
 
-    uploadedDb = "userBackups/{0}/{1}".format(telegram_user, [zipname for zipname in files if zipname.endswith(".db")][0])
+    Each dict has:
+        id        - the item id/href inside the ePub
+        title     - best-effort chapter title
+        content_html - raw HTML of the chapter body
+        content_text - plain text extracted from the HTML
+    """
+    logger.info("parse_epub - path: %s", epub_path)
+    book = epub.read_epub(epub_path, options={"ignore_ncx": False})
 
-    connection = sqlite3.connect(uploadedDb)
-    cursor = connection.cursor()
-    cursor.execute("SELECT Count(*) FROM Note")
-    notesN = cursor.fetchone()[0]
-    cursor.execute("SELECT Count(*) FROM Field")
-    inputN = cursor.fetchone()[0]
-    cursor.execute("SELECT Count(*) FROM TagM")
-    tagMaptN = cursor.fetchone()[0]
-    cursor.execute("SELECT Count(*) FROM Tag")
-    tagN = cursor.fetchone()[0]
-    cursor.execute("SELECT Count(*) FROM Book")
-    bookmarkN = cursor.fetchone()[0]
-    cursor.execute("SELECT LastModified FROM LastModified")
-    lastModified = cursor.fetchone()[0]
-    cursor.execute("SELECT Count(*) FROM Mark")
-    userMarkN = cursor.fetchone()[0]
-    connection.close()
+    # Build a map from href -> toc title using the TOC
+    toc_title_map: dict[str, str] = {}
+    _walk_toc(book.toc, toc_title_map)
 
-    shutil.rmtree("userBackups/{0}/".format(telegram_user))
+    chapters: list[dict] = []
+    for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
+        raw_html = item.get_content().decode("utf-8", errors="replace")
+        soup = BeautifulSoup(raw_html, "html.parser")
+        plain_text = soup.get_text(separator="\n", strip=True)
 
-    return notesN, inputN, tagMaptN, tagN, bookmarkN, lastModified, userMarkN
+        # Skip very short items (covers, copyright, etc.)
+        if len(plain_text) < MIN_CHAPTER_TEXT_LENGTH:
+            continue
 
-#######################
-### EXTRACTING HTML ###
-#######################
+        # Determine title: prefer TOC entry, fall back to first <h1>-<h3>, then item id
+        href_key = item.get_name()
+        title = toc_title_map.get(href_key, "")
+        if not title:
+            heading = soup.find(["h1", "h2", "h3"])
+            title = heading.get_text(strip=True) if heading else href_key
 
-def epub_extract_html(url, get_all):
-    logger.info("epub_extract_html - URL: {0} - Full Run: {1}".format(url, get_all))
+        chapters.append({
+            "id": href_key,
+            "title": title,
+            "content_html": raw_html,
+            "content_text": plain_text,
+        })
 
-    html = requests.get(url).text
-    soup = BeautifulSoup(html, features="html5lib")
-    title = soup.find("h1").text
-    classArticleId = soup.find("sontile", {"id": "sontile"}).get("class")
-    articleId = next(x for x in classArticleId if x.startswith("iss"))[4:] + "00"
-    articleN = soup.find("p", {"id": "p1"}).text
+    logger.info("parse_epub - found %d chapters", len(chapters))
+    return chapters
 
-    if get_all:
-        base_text = soup.find("p", {"id": "p4"}).text
-        summary = soup.find("p", {"id": "p6"}).text
-        DiD = soup.find("input", {"name": "xid"}).get("value")
-        p_elements = soup.find("div", {"class": "bodyTxt"})
-        questions = p_elements.find_all("p", {"class": lambda x: x and x.startswith("qu")})
-        paragraphs = p_elements.find_all("p", {"class": lambda x: x and x.startswith("p")})
-        textareas = soup.find_all("textarea")
 
-        # Example q_map = {0: [q1, [p1]], 1: [q2&3, [p2, p3]]}
-        q_map = {}
-        i = 0
-        for q in questions:
-            q_map[i] = [q]
-            q_map[i].append([p for p in paragraphs if p.has_attr('data-rel-pid') and p.get('data-rel-pid').strip('[]') in q.get('data-pid')])
-            i += 1
+def _walk_toc(toc_items, title_map: dict):
+    """Recursively walk the ePub TOC and populate href->title mapping."""
+    for item in toc_items:
+        if isinstance(item, tuple):
+            # Nested section: (Section, [children])
+            section, children = item
+            if hasattr(section, "href") and hasattr(section, "title"):
+                clean_href = section.href.split("#")[0]
+                title_map[clean_href] = section.title
+            _walk_toc(children, title_map)
+        elif hasattr(item, "href") and hasattr(item, "title"):
+            clean_href = item.href.split("#")[0]
+            title_map[clean_href] = item.title
 
-        return title, base_text, summary, questions, DiD, articleId, q_map, textareas
-    else:
-        return title, articleId, articleN
 
-####################
-### QUERY OPENAI ###
-####################
+# ===================================================================
+# 2. query_openai
+# ===================================================================
 
-def epub_query_openai(title, base_text, summary, q_map, qs_user, trans):
-    logger = logging.getLogger(__name__)
-    logger.info("epub_query_openai - Title: {0}".format(title))
+def _init_cache_db():
+    """Ensure the cache SQLite database and table exist."""
+    os.makedirs(os.path.dirname(CACHE_DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(CACHE_DB_PATH)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS cache "
+        "(hash TEXT PRIMARY KEY, response TEXT)"
+    )
+    conn.commit()
+    conn.close()
 
-    questions = [f"{i+1}. {question}" for i, question in enumerate(qs_user) if question]
-    questions_text = "\n".join(questions)
-    logger.info("epub_query_openai - Questions Text: {0}".format(questions_text))
 
-    # Prepare the system prompt (now incorporated into the user input)
-    system_prompt_template = trans("""Eres un asistente que únicamente usa place.holder y las publicaciones de place.holder.
-Yo estoy preparándome... {title}, {base_text}, resumen es el siguiente:
-{summary}
-Para cada pregunta y párrafo o párrafos que te vaya enviando a partir de ahora, responderás en una lista lo siguiente:
-{questions_text}
-No escribas estas preguntas de nuevo en la respuesta. Separa las respuestas con dos retornos de carro.""")
+def _cache_key(chapter_text: str, questions: list[str]) -> str:
+    payload = chapter_text + "|||" + "|||".join(questions)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
-    system_prompt = system_prompt_template.format(
-        title=title,
-        base_text=base_text,
-        summary=summary,
-        questions_text=questions_text
+
+def query_openai(
+    book_title: str,
+    chapter_title: str,
+    chapter_text: str,
+    questions: list[str],
+    language: str,
+) -> dict[int, str]:
+    """Send chapter text + questions to OpenAI and return numbered answers.
+
+    Returns a dict mapping question index (0-based) to the answer string.
+    Responses are cached in SQLite to avoid redundant API calls.
+    """
+    logger.info("query_openai - book: %s, chapter: %s", book_title, chapter_title)
+
+    # --- Check cache ---
+    _init_cache_db()
+    key = _cache_key(chapter_text, questions)
+    conn = sqlite3.connect(CACHE_DB_PATH)
+    row = conn.execute("SELECT response FROM cache WHERE hash = ?", (key,)).fetchone()
+    if row:
+        logger.info("query_openai - cache hit for chapter: %s", chapter_title)
+        conn.close()
+        return _parse_numbered_answers(row[0], len(questions))
+    conn.close()
+
+    # --- Build prompt ---
+    numbered_questions = "\n".join(
+        f"{i + 1}. {q}" for i, q in enumerate(questions)
     )
 
-    # Log the system prompt
-    logger.info("epub_query_openai - System Prompt:\n{0}".format(system_prompt))
+    system_prompt = (
+        f"You are a study assistant helping prepare notes for a book. "
+        f"The book is titled '{book_title}'. "
+        f"For the chapter '{chapter_title}', answer each of the following study questions "
+        f"based on the chapter content. Number your answers to match the questions. "
+        f"Be concise but insightful. "
+        f"Respond entirely in the language with code '{language}'."
+    )
 
-    # Set up the ChatOpenAI LLM
-    llm = ChatOpenAI(model_name="gpt-4o-mini")
+    user_message = (
+        f"Chapter content:\n\n{chapter_text}\n\n"
+        f"Questions:\n{numbered_questions}"
+    )
 
-    # Define a simple prompt that just uses the input
-    prompt = PromptTemplate.from_template("{input}")
+    # --- Call OpenAI ---
+    client = OpenAI()
+    response = client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ],
+        temperature=0.4,
+    )
 
-    notes = {}
-    i = 0
+    answer_text = response.choices[0].message.content.strip()
+    logger.info("query_openai - received response for chapter: %s", chapter_title)
 
-    for idx, q in enumerate(q_map.values()):
-        chain = LLMChain(llm=llm, prompt=prompt)
+    # --- Store in cache ---
+    conn = sqlite3.connect(CACHE_DB_PATH)
+    conn.execute(
+        "INSERT OR REPLACE INTO cache (hash, response) VALUES (?, ?)",
+        (key, answer_text),
+    )
+    conn.commit()
+    conn.close()
 
-        # Flatten the paragraphs
-        flattened_paragraph = "".join([p.text for p in q[1]])
+    return _parse_numbered_answers(answer_text, len(questions))
 
-        # Prepare the user input
-        user_input_template = trans("Pregunta: {question} -- Párrafo(s): {paragraphs}")
-        user_input = user_input_template.format(
-            question=q[0].text,
-            paragraphs=flattened_paragraph
-        )
 
-        # Combine the system prompt and user input
-        full_input = system_prompt + "\n\n" + user_input
+def _parse_numbered_answers(text: str, n_questions: int) -> dict[int, str]:
+    """Parse a numbered response into a dict {0: answer0, 1: answer1, ...}.
 
-        # Log the user input
-        logger.info("epub_query_openai - User Input for question {0}:\n{1}".format(idx+1, user_input))
+    Tries to split on lines starting with "1.", "2.", etc.  Falls back to
+    splitting by double newlines if numbering is absent.
+    """
+    import re
 
-        # Log the full input (system prompt + user input)
-        logger.info("epub_query_openai - Full Input for question {0}:\n{1}".format(idx+1, full_input))
+    answers: dict[int, str] = {}
+    # Try splitting by numbered pattern "1." "2." etc.
+    parts = re.split(r"\n(?=\d+\.\s)", text)
+    for part in parts:
+        m = re.match(r"(\d+)\.\s*(.*)", part, re.DOTALL)
+        if m:
+            idx = int(m.group(1)) - 1  # 0-based
+            answers[idx] = m.group(2).strip()
 
-        # Call the chain to get the response
-        notes[i] = chain.predict(input=full_input)
+    if len(answers) >= n_questions:
+        return answers
 
-        # Log the response
-        logger.info("epub_query_openai(Note) - Note for question {0}:\n{1}".format(idx+1, notes[i]))
+    # Fallback: split by double newline
+    chunks = [c.strip() for c in text.split("\n\n") if c.strip()]
+    for i, chunk in enumerate(chunks[:n_questions]):
+        if i not in answers:
+            # Remove leading number if present
+            cleaned = re.sub(r"^\d+\.\s*", "", chunk)
+            answers[i] = cleaned
 
-        i += 1
+    return answers
 
-    return notes
 
-##############################
-### WRITE EPUBLIBRARY FILE ###
-##############################
+# ===================================================================
+# 3. write_annotated_epub
+# ===================================================================
 
-def calculate_user_data_hash(user_data_db_path):
-    sha256_hash = hashlib.sha256()
-    with open(user_data_db_path, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
-            sha256_hash.update(byte_block)
-    hash_digest = sha256_hash.hexdigest()
-    return hash_digest
+def write_annotated_epub(
+    original_epub_path: str,
+    chapters_with_notes: list[dict],
+    output_path: str,
+) -> str:
+    """Create a new ePub with study notes appended to selected chapters.
 
-def get_last_modified_date(user_data_db_path):
-    last_modified_timestamp = os.path.getmtime(user_data_db_path)
-    last_modified_date = datetime.fromtimestamp(
-        last_modified_timestamp,
-        pytz.timezone('Europe/Madrid')
-    ).isoformat()
-    return last_modified_date
+    chapters_with_notes: list of dicts with at least
+        {"id": str, "questions": [str], "notes": {idx: str}}
 
-def write_epublibrary(DiD, articleId, title, questions, notes, telegram_user, textareas):
-    logger.info("write_epublibrary - Document ID: {0} - Article ID: {1} - Title: {2}".format(DiD, articleId, title))
-    uploadedEpubLibrary = 'userBackups/{0}.epublibrary'.format(telegram_user)
+    Returns the output_path.
+    """
+    logger.info("write_annotated_epub - source: %s, output: %s", original_epub_path, output_path)
+    book = epub.read_epub(original_epub_path, options={"ignore_ncx": False})
 
-    os.makedirs("/app/userBackups/{0}".format(telegram_user), exist_ok=True)
+    # Map chapter id -> notes payload
+    notes_map: dict[str, dict] = {
+        ch["id"]: ch for ch in chapters_with_notes if ch.get("notes")
+    }
 
-    now = datetime.now(pytz.timezone('Europe/Madrid'))
-    now_date = now.strftime("%Y-%m-%d")
-    now_iso = now.isoformat("T", "seconds")
-    now_utc = now.astimezone(pytz.UTC)
-    now_utc_iso = now_utc.isoformat("T", "seconds").replace('+00:00', 'Z')
-    schema_version = 140  # TODO: Upgrade when needed
+    for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
+        href = item.get_name()
+        if href not in notes_map:
+            continue
 
-    thumbnail_file = "extra/default_thumbnail.png"
+        ch = notes_map[href]
+        questions = ch.get("questions", [])
+        notes = ch.get("notes", {})
+        if not notes:
+            continue
 
-    if os.path.isfile(uploadedEpubLibrary):
-        logger.info("Archivo .epublibrary encontrado")
-        with zipfile.ZipFile(uploadedEpubLibrary, 'r') as zip_ref:
-            files = zip_ref.namelist()
-            zip_ref.extractall("userBackups/{0}/".format(telegram_user))
+        # Build the notes HTML block
+        notes_html = _build_notes_html(questions, notes)
 
-        uploadedDb = "userBackups/{0}/{1}".format(telegram_user, [zipname for zipname in files if zipname.endswith(".db")][0])
-        manifestUser = "userBackups/{0}/manifest.json".format(telegram_user)
-
-        connection = sqlite3.connect(uploadedDb)
-        cursor = connection.cursor()
-        cursor.execute("SELECT LocationId FROM Location WHERE DiD=?", (DiD,))
-        locationId = cursor.fetchone()
-        if locationId:
-            locationId = locationId[0]
+        # Append to existing content
+        raw_html = item.get_content().decode("utf-8", errors="replace")
+        # Insert before closing </body> if present, otherwise just append
+        if "</body>" in raw_html:
+            raw_html = raw_html.replace("</body>", notes_html + "\n</body>")
         else:
-            cursor.execute("SELECT max(LocationId) FROM Location")
-            max_location_id = cursor.fetchone()[0]
-            locationId = max_location_id + 1 if max_location_id else 1
-            cursor.execute("""INSERT INTO Location (LocationId, DiD, IssueTagNumber, sym, Type)
-                VALUES (?, ?, ?, "w", 0);""", (locationId, DiD, articleId))
+            raw_html += notes_html
 
-        for i in notes:
-            cursor.execute("""INSERT INTO InputField ('LocationId', 'TextTag', 'Value') VALUES (?, ?, ?)""",
-                           (locationId, textareas[i].get("id"), notes[i].replace("'", '"')))
+        item.set_content(raw_html.encode("utf-8"))
 
-        cursor.execute("UPDATE LastModified SET LastModified = ?", (now_iso,))
+    os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
+    epub.write_epub(output_path, book)
+    logger.info("write_annotated_epub - done: %s", output_path)
+    return output_path
 
-        connection.commit()
-        connection.close()
 
-        # Calculate hash and last modified date
-        hash_digest = calculate_user_data_hash(uploadedDb)
-        last_modified_date = get_last_modified_date(uploadedDb)
+def _build_notes_html(questions: list[str], notes: dict[int, str]) -> str:
+    """Return an HTML snippet with the study notes section."""
+    lines = [
+        '<div style="margin-top: 2em; padding: 1em; '
+        'background-color: #FFF8DC; border-top: 2px solid #CCC;">',
+        '<h3 style="margin-top: 0;">Study Notes - AskePub</h3>',
+    ]
+    for idx in sorted(notes.keys()):
+        q_text = questions[idx] if idx < len(questions) else f"Question {idx + 1}"
+        a_text = notes[idx]
+        lines.append(
+            f'<p><strong>{_escape_html(q_text)}</strong></p>'
+            f'<p>{_escape_html(a_text)}</p>'
+        )
+    lines.append("</div>")
+    return "\n".join(lines)
 
-        # Create manifest data
-        manifest_data = {
-            "type": 0,
-            "name": f"askepub-backup_{now_date}",
-            "userDataBackup": {
-                "deviceName": "askepub",
-                "hash": hash_digest,
-                "lastModifiedDate": last_modified_date,
-                "databaseName": "userData.db",
-                "schemaVersion": schema_version
-            },
-            "version": 1,
-            "creationDate": now.isoformat()
-        }
 
-        manifest_file = 'userBackups/{0}/manifest.json'.format(telegram_user)
-        with open(manifest_file, 'w', encoding='utf-8') as f:
-            json.dump(manifest_data, f, ensure_ascii=False)
+def _escape_html(text: str) -> str:
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+    )
 
-        fileName = "userBackups/{0}/askepub-{1}-{2}.epublibrary".format(telegram_user, DiD, now_date)
-        with zipfile.ZipFile(fileName, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.write(uploadedDb, arcname="userData.db")
-            zf.write(manifest_file, arcname="manifest.json")
-            zf.write(thumbnail_file, arcname="default_thumbnail.png")
 
-        os.remove(uploadedDb)
-        os.remove(manifest_file)
-        os.remove(uploadedEpubLibrary)
-        if os.path.exists(manifestUser):
-            os.remove(manifestUser)
+# ===================================================================
+# 4. write_docx_pdf
+# ===================================================================
 
-    else:
-        dbOriginal = "dbs/userData.db.original"
-        dbFromUser = "userBackups/{0}/userData.db".format(telegram_user)
-        shutil.copyfile(src=dbOriginal, dst=dbFromUser)
+def write_docx_pdf(
+    book_title: str,
+    chapters_data: list[dict],
+    telegram_user: str,
+) -> tuple[str, str]:
+    """Create a DOCX (and PDF via abiword) with all study notes.
 
-        connection = sqlite3.connect(dbFromUser)
-        cursor = connection.cursor()
+    chapters_data: list of {"title": str, "questions": [str], "notes": {idx: str}}
 
-        cursor.execute("""INSERT INTO Location (LocationId, DiD, IssueTagNumber, sym, Type)
-            VALUES (1, ?, ?, "w", 0);""", (DiD, articleId))
+    Returns (docx_path, pdf_path).
+    """
+    logger.info("write_docx_pdf - book: %s, user: %s", book_title, telegram_user)
 
-        for i in notes:
-            cursor.execute("""INSERT INTO InputField ('LocationId', 'TextTag', 'Value') VALUES (1, ?, ?)""",
-                           (textareas[i].get("id"), notes[i].replace("'", '"')))
+    now_date = datetime.now(TIMEZONE).strftime("%Y-%m-%d")
+    user_dir = f"userBackups/{telegram_user}"
+    os.makedirs(user_dir, exist_ok=True)
 
-        cursor.execute("UPDATE LastModified SET LastModified = ?", (now_iso,))
+    safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in book_title)[:60]
+    docx_path = os.path.join(user_dir, f"askepub-{safe_title}-{now_date}.docx")
+    pdf_path = os.path.join(user_dir, f"askepub-{safe_title}-{now_date}.pdf")
 
-        connection.commit()
-        connection.close()
-
-        # Calculate hash and last modified date
-        hash_digest = calculate_user_data_hash(dbFromUser)
-        last_modified_date = get_last_modified_date(dbFromUser)
-
-        # Create manifest data
-        manifest_data = {
-            "type": 0,
-            "name": f"askepub-backup_{now_date}",
-            "userDataBackup": {
-                "deviceName": "askepub",
-                "hash": hash_digest,
-                "lastModifiedDate": last_modified_date,
-                "databaseName": "userData.db",
-                "schemaVersion": schema_version
-            },
-            "version": 1,
-            "creationDate": now.isoformat()
-        }
-
-        manifest_file = 'userBackups/{0}/manifest.json'.format(telegram_user)
-        with open(manifest_file, 'w', encoding='utf-8') as f:
-            json.dump(manifest_data, f, ensure_ascii=False)
-
-        fileName = "userBackups/{0}/askepub-{1}-{2}.epublibrary".format(telegram_user, DiD, now_date)
-        with zipfile.ZipFile(fileName, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.write(dbFromUser, arcname="userData.db")
-            zf.write(manifest_file, arcname="manifest.json")
-            zf.write(thumbnail_file, arcname="default_thumbnail.png")
-
-        os.remove(dbFromUser)
-        os.remove(manifest_file)
-
-    return fileName
-
-########################
-### WRITE DOCX AND PDF #
-########################
-
-def write_docx_pdf(DiD, title, questions, notes, telegram_user):
-    now_date = datetime.now(pytz.timezone('Europe/Madrid')).strftime("%Y-%m-%d")
     document = Document()
 
-    bold_style = document.styles.add_style('Bold List Number', WD_STYLE_TYPE.PARAGRAPH)
+    # Add bold list number style
+    bold_style = document.styles.add_style("Bold List Number", WD_STYLE_TYPE.PARAGRAPH)
     bold_style.font.bold = True
 
-    document.add_heading(title, 0)
+    # Title
+    document.add_heading(book_title, level=0)
 
-    for i in range(len(questions)):
-        p = document.add_paragraph(style='Bold List Number')
-        p.add_run(questions[i].text).font.size = Pt(12)
-        document.add_paragraph(notes[i])
+    # Credit line
+    p = document.add_paragraph()
+    p.add_run("Generated by AskePub - https://github.com/GeiserX/AskePub").italic = True
 
-    fileNameDoc = "userBackups/{0}/askepub-{1}-{2}.docx".format(telegram_user, DiD, now_date)
-    document.save(fileNameDoc)
+    # Chapters
+    for ch in chapters_data:
+        document.add_heading(ch["title"], level=1)
+        questions = ch.get("questions", [])
+        notes = ch.get("notes", {})
 
-    fileNamePDF = "userBackups/{0}/askepub-{1}-{2}.pdf".format(telegram_user, DiD, now_date)
-    cmd_str = "xvfb-run abiword --to=pdf --to-name='{0}' '{1}'".format(fileNamePDF, fileNameDoc)
-    subprocess.run(cmd_str, shell=True)
-    return fileNameDoc, fileNamePDF
+        for idx in sorted(notes.keys()):
+            q_text = questions[idx] if idx < len(questions) else f"Question {idx + 1}"
+            a_text = notes[idx]
 
-################
-### MAIN CODE ##
-################
+            q_para = document.add_paragraph(style="Bold List Number")
+            q_para.add_run(q_text).font.size = Pt(12)
+            document.add_paragraph(a_text)
 
-def main(url, telegram_user, qs_user, language):
-    # Set up translation function
-    domain = "askepub"
-    locale_dir = os.path.join(os.path.dirname(__file__), '../locales')
-    translation = gettext.translation(domain, localedir=locale_dir, languages=[language], fallback=True)
-    trans = translation.gettext
+    document.save(docx_path)
+    logger.info("write_docx_pdf - DOCX saved: %s", docx_path)
 
-    title, base_text, summary, questions, DiD, articleId, q_map, textareas = epub_extract_html(url, get_all=True)
-    notes = epub_query_openai(title, base_text, summary, q_map, qs_user, trans)
-    filenameepub = write_epublibrary(DiD, articleId, title, questions, notes, telegram_user, textareas)
-    filenamedoc, filenamepdf = write_docx_pdf(DiD, title, questions, notes, telegram_user)
-    return filenameepub, filenamedoc, filenamepdf
+    # Convert to PDF
+    cmd = f"xvfb-run abiword --to=pdf --to-name='{pdf_path}' '{docx_path}'"
+    try:
+        subprocess.run(cmd, shell=True, check=True, timeout=120)
+        logger.info("write_docx_pdf - PDF saved: %s", pdf_path)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        logger.error("write_docx_pdf - PDF conversion failed: %s", exc)
+
+    return docx_path, pdf_path
+
+
+# ===================================================================
+# 5. main (orchestrator)
+# ===================================================================
+
+def main(
+    epub_path: str,
+    telegram_user: str,
+    selected_chapter_ids: list[str],
+    questions: list[str],
+    language: str,
+) -> tuple[str, str, str]:
+    """Orchestrate the full workflow.
+
+    1. Parse the ePub
+    2. Filter to selected chapters
+    3. Query OpenAI for each chapter
+    4. Write annotated ePub
+    5. Write DOCX + PDF
+    6. Return (annotated_epub_path, docx_path, pdf_path)
+    """
+    logger.info(
+        "main - epub: %s, user: %s, chapters: %s, language: %s",
+        epub_path, telegram_user, selected_chapter_ids, language,
+    )
+
+    # 1. Parse
+    all_chapters = parse_epub(epub_path)
+
+    # 2. Filter
+    selected = [ch for ch in all_chapters if ch["id"] in selected_chapter_ids]
+    if not selected:
+        logger.warning("main - no matching chapters found, processing all")
+        selected = all_chapters
+
+    # Derive book title from ePub metadata
+    book = epub.read_epub(epub_path, options={"ignore_ncx": False})
+    book_title = "Unknown"
+    dc_title = book.get_metadata("DC", "title")
+    if dc_title:
+        book_title = dc_title[0][0]
+    logger.info("main - book title: %s", book_title)
+
+    # 3. Query OpenAI for each selected chapter
+    chapters_with_notes: list[dict] = []
+    for ch in selected:
+        notes = query_openai(
+            book_title=book_title,
+            chapter_title=ch["title"],
+            chapter_text=ch["content_text"],
+            questions=questions,
+            language=language,
+        )
+        chapters_with_notes.append({
+            "id": ch["id"],
+            "title": ch["title"],
+            "questions": questions,
+            "notes": notes,
+        })
+
+    # 4. Write annotated ePub
+    now_date = datetime.now(TIMEZONE).strftime("%Y-%m-%d")
+    user_dir = f"userBackups/{telegram_user}"
+    os.makedirs(user_dir, exist_ok=True)
+
+    safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in book_title)[:60]
+    annotated_epub_path = os.path.join(user_dir, f"askepub-{safe_title}-{now_date}.epub")
+    write_annotated_epub(epub_path, chapters_with_notes, annotated_epub_path)
+
+    # 5. Write DOCX + PDF
+    docx_path, pdf_path = write_docx_pdf(book_title, chapters_with_notes, telegram_user)
+
+    # 6. Return paths
+    logger.info("main - complete. Files: %s, %s, %s", annotated_epub_path, docx_path, pdf_path)
+    return annotated_epub_path, docx_path, pdf_path
+
 
 if __name__ == "__main__":
     # Example usage
-    url = "https://www.place.holder/test/"
-    telegram_user = "user_id"  # Replace with actual Telegram user ID
-    qs_user = [
-        "Una ilustración o ejemplo para explicar algún punto principal",
-        "Una experiencia en concreto, aportando referencias exactas de place.holder, que esté muy relacionada",
-        "Una explicación sobre uno de las referencias que aparezcan, que aplique."
-    ]
-    language = "es"  # Replace with the desired language code, e.g., "en" for English
-    main(url, telegram_user, qs_user, language)
+    result = main(
+        epub_path="example.epub",
+        telegram_user="test_user",
+        selected_chapter_ids=[],
+        questions=[
+            "What is the main argument of this chapter?",
+            "Provide a concrete example or illustration for a key point.",
+            "How does this chapter connect to the overall theme of the book?",
+        ],
+        language="en",
+    )
+    print("Output files:", result)

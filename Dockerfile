@@ -1,11 +1,13 @@
 FROM python:3.12-slim-bookworm
 
 WORKDIR /app
-RUN apt-get update && apt-get install -y locales-all abiword build-essential xvfb sqlite3
-RUN mkdir userBackups
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    locales-all abiword xvfb sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p userBackups dbs
 
 COPY requirements.txt /app/requirements.txt
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app
 

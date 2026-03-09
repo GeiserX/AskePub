@@ -1,0 +1,169 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: AskePub 1.0\n"
+"POT-Creation-Date: 2026-03-09 00:00+0100\n"
+"PO-Revision-Date: 2026-03-09 00:00+0100\n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Hola! Bienvenido a AskePub. Por favor, selecciona tu idioma:"
+msgstr "Bonjour ! Bienvenue sur AskePub. Veuillez sélectionner votre langue :"
+
+msgid "Idioma seleccionado: {lang}. Envíame un archivo .epub para comenzar."
+msgstr "Langue sélectionnée : {lang}. Envoyez-moi un fichier .epub pour commencer."
+
+msgid "Por favor, envía un archivo .epub válido."
+msgstr "Veuillez envoyer un fichier .epub valide."
+
+msgid "Archivo recibido. Analizando..."
+msgstr "Fichier reçu. Analyse en cours..."
+
+msgid ""
+"He encontrado {count} capítulos en este libro:\n"
+"\n"
+"{chapters}\n"
+"\n"
+"Escribe los números de los capítulos que quieres estudiar (ej: 1,3,5 o 1-5 "
+"o '{all_word}')."
+msgstr ""
+"J'ai trouvé {count} chapitres dans ce livre :\n"
+"\n"
+"{chapters}\n"
+"\n"
+"Écrivez les numéros des chapitres que vous souhaitez étudier (ex : 1,3,5 ou "
+"1-5 ou '{all_word}')."
+
+msgid ""
+"Selección no válida. Por favor, usa números separados por comas (1,3,5), "
+"rangos (1-5), o escribe '{all_word}'."
+msgstr ""
+"Sélection non valide. Veuillez utiliser des numéros séparés par des "
+"virgules (1,3,5), des plages (1-5), ou écrivez '{all_word}'."
+
+#, python-brace-format
+msgid ""
+"Has seleccionado {count} capítulo(s). Tus preguntas actuales:\n"
+"\n"
+"{questions}\n"
+"\n"
+"¿Quieres personalizar las preguntas?"
+msgstr ""
+"Vous avez sélectionné {count} chapitre(s). Vos questions actuelles :\n"
+"\n"
+"{questions}\n"
+"\n"
+"Souhaitez-vous personnaliser les questions ?"
+
+msgid "Sí, personalizar"
+msgstr "Oui, personnaliser"
+
+msgid "No, continuar"
+msgstr "Non, continuer"
+
+msgid "¿Qué deseas hacer?"
+msgstr "Que souhaitez-vous faire ?"
+
+msgid "Editar pregunta"
+msgstr "Modifier la question"
+
+msgid "Eliminar pregunta"
+msgstr "Supprimer la question"
+
+msgid "Añadir pregunta"
+msgstr "Ajouter une question"
+
+msgid "Continuar con la preparación"
+msgstr "Continuer la préparation"
+
+msgid "Escribe el número de la pregunta a editar:"
+msgstr "Écrivez le numéro de la question à modifier :"
+
+#, python-brace-format
+msgid "Escribe el nuevo texto para la pregunta {num}:"
+msgstr "Écrivez le nouveau texte pour la question {num} :"
+
+msgid "Pregunta actualizada."
+msgstr "Question mise à jour."
+
+msgid "Escribe el número de la pregunta a eliminar:"
+msgstr "Écrivez le numéro de la question à supprimer :"
+
+msgid "Pregunta eliminada."
+msgstr "Question supprimée."
+
+msgid "No puedes eliminar la última pregunta."
+msgstr "Vous ne pouvez pas supprimer la dernière question."
+
+msgid "Escribe el texto de la nueva pregunta:"
+msgstr "Écrivez le texte de la nouvelle question :"
+
+msgid "Pregunta añadida."
+msgstr "Question ajoutée."
+
+msgid "Preparando tus notas de estudio. Esto puede tardar unos minutos..."
+msgstr "Préparation de vos notes d'étude. Cela peut prendre quelques minutes..."
+
+msgid "Aquí tienes tus archivos:"
+msgstr "Voici vos fichiers :"
+
+msgid "ePub anotado con tus notas de estudio"
+msgstr "ePub annoté avec vos notes d'étude"
+
+msgid "Documento Word con las notas"
+msgstr "Document Word avec les notes"
+
+msgid "Documento PDF con las notas"
+msgstr "Document PDF avec les notes"
+
+msgid "¿Deseas estudiar otro libro o más capítulos?"
+msgstr "Souhaitez-vous étudier un autre livre ou d'autres chapitres ?"
+
+msgid "Sí"
+msgstr "Oui"
+
+msgid "No"
+msgstr "Non"
+
+msgid "Gracias por usar AskePub. Usa /start para comenzar de nuevo."
+msgstr "Merci d'avoir utilisé AskePub. Utilisez /start pour recommencer."
+
+msgid "Error al procesar el archivo. Por favor, intenta con otro .epub."
+msgstr "Erreur lors du traitement du fichier. Veuillez essayer avec un autre .epub."
+
+#, python-brace-format
+msgid "Has alcanzado el límite. Intenta de nuevo en {minutes} minutos."
+msgstr "Vous avez atteint la limite. Réessayez dans {minutes} minutes."
+
+msgid "No tienes permiso para usar este bot."
+msgstr "Vous n'avez pas la permission d'utiliser ce bot."
+
+msgid "Operación cancelada."
+msgstr "Opération annulée."
+
+msgid "todos"
+msgstr "tous"
+
+msgid ""
+"¿Quieres mantener tus preguntas anteriores o usar las predeterminadas?"
+msgstr ""
+"Souhaitez-vous conserver vos questions précédentes ou utiliser celles par "
+"défaut ?"
+
+msgid "Mantener preguntas"
+msgstr "Conserver les questions"
+
+msgid "Usar predeterminadas"
+msgstr "Utiliser les valeurs par défaut"
+
+msgid "Resume los puntos clave y argumentos principales de esta sección"
+msgstr "Résumez les points clés et les arguments principaux de cette section"
+
+msgid "¿Cuáles son los conceptos o términos más importantes introducidos?"
+msgstr "Quels sont les concepts ou termes les plus importants introduits ?"
+
+msgid "¿Qué preguntas plantea o deja sin responder esta sección?"
+msgstr "Quelles questions cette section soulève-t-elle ou laisse-t-elle sans réponse ?"
