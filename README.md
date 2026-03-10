@@ -1,9 +1,16 @@
-![img](https://github.com/GeiserX/askepub/blob/main/extra/logo.jpg?raw=true)
-# AskePub
+<p align="center"><img src="docs/images/banner.svg" alt="AskePub Banner" width="900"></p>
 
-[![License](https://img.shields.io/github/license/GeiserX/askepub)](https://github.com/GeiserX/askepub/blob/main/LICENSE)
+<p align="center"><img src="https://github.com/GeiserX/askepub/blob/main/extra/logo.jpg?raw=true" alt="AskePub Logo" width="150"></p>
 
-Telegram bot that helps you study any ePub book using AI-generated notes. Upload an ePub, pick your chapters, customize your study questions, and get back an annotated ePub, Word document, and PDF with contextual study notes powered by GPT-4o.
+<h1 align="center">AskePub</h1>
+
+<p align="center">
+  <a href="https://github.com/GeiserX/askepub/blob/main/LICENSE"><img src="https://img.shields.io/github/license/GeiserX/askepub" alt="License"></a>
+</p>
+
+<p align="center"><strong>Telegram bot assistant to help you prepare ePubs. Uses ChatGPT-4o to write contextual notes.</strong></p>
+
+---
 
 ## Features
 
