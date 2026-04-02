@@ -86,6 +86,21 @@ Feel free to dive in! [Open an issue](https://github.com/GeiserX/askepub/issues/
 
 AskePub follows the [Contributor Covenant](http://contributor-covenant.org/version/2/1/) Code of Conduct.
 
+## Related Projects
+
+**ePub Tools:**
+
+- [ePubLangMerger](https://github.com/GeiserX/ePubLangMerger) — Merge two ePubs into a bilingual parallel reading book
+- [epub-and-vtt-to-llm](https://github.com/GeiserX/epub-and-vtt-to-llm) — Fine-tune LLMs from ePub and subtitle data
+
+**Telegram Bots:**
+
+- [Telegram-Archive](https://github.com/GeiserX/Telegram-Archive) — Automated Telegram backup with local web viewer
+- [paperless-telegram-bot](https://github.com/GeiserX/paperless-telegram-bot) — Manage Paperless-NGX documents through Telegram
+- [telegram-delay-channel-cloner](https://github.com/GeiserX/telegram-delay-channel-cloner) — Relay messages between channels with delay
+- [jellyfin-telegram-channel-sync](https://github.com/GeiserX/jellyfin-telegram-channel-sync) — Sync Jellyfin access with Telegram membership
+- [telegram-slskd-local-bot](https://github.com/GeiserX/telegram-slskd-local-bot) — Automated music discovery and download via Telegram
+
 ## License
 
 [MIT](LICENSE)
