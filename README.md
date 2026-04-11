@@ -6,6 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/GeiserX/askepub/blob/main/LICENSE"><img src="https://img.shields.io/github/license/GeiserX/askepub" alt="License"></a>
+  <a href="https://codecov.io/gh/GeiserX/AskePub"><img src="https://codecov.io/gh/GeiserX/AskePub/graph/badge.svg" alt="codecov"></a>
 </p>
 
 <p align="center"><strong>Telegram bot assistant to help you prepare ePubs. Uses ChatGPT-4o to write contextual notes.</strong></p>
