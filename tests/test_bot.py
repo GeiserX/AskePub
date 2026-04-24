@@ -14,8 +14,8 @@ import pytz
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 # We must set env vars BEFORE importing bot, since bot reads them at module level
-os.environ.setdefault("ADMIN_ID", "111111")
-os.environ.setdefault("TOKEN", "fake-token")
+os.environ["ADMIN_ID"] = "111111"
+os.environ["TOKEN"] = "fake-token"
 
 TIMEZONE = pytz.timezone("Europe/Madrid")
 
