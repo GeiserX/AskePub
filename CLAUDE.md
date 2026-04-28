@@ -1,4 +1,4 @@
-# AGENTS.md — AskePub
+# CLAUDE.md — AskePub
 
 ## Project Overview
 
