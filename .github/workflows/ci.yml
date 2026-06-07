@@ -18,7 +18,7 @@ jobs:
         env:
           ADMIN_ID: "1"
           TOKEN: "fake"
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v7
         if: github.event_name == 'push'
         with:
           fail_ci_if_error: false
