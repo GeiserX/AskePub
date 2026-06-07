@@ -1,4 +1,4 @@
-beautifulsoup4==4.14.3
+beautifulsoup4==4.15.0
 ebooklib==0.20
 openai==1.109.1
 pytz==2024.2
